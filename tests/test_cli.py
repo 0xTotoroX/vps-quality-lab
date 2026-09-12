@@ -1,4 +1,5 @@
 import json
+import os
 import subprocess
 import sys
 
@@ -63,3 +64,11 @@ def test_installed_entrypoint_exit_code():
                             capture_output=True, text=True, timeout=10)
     assert result.returncode == 2
     assert json.loads(result.stdout)["status"] == "failed"
+
+
+def test_machine_help_remains_plain_when_ci_forces_color():
+    result = subprocess.run([sys.executable, "-m", "vps_quality_lab", "--json", "run", "--help"],
+                            capture_output=True, text=True, timeout=10,
+                            env={**os.environ, "FORCE_COLOR": "1", "GITHUB_ACTIONS": "true"})
+    text = json.loads(result.stdout)["data"]["help"]
+    assert result.returncode == 0 and "--config" in text and "\x1b" not in text

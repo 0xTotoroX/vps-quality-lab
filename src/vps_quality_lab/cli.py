@@ -4,6 +4,7 @@ import contextlib
 import io
 import json
 import os
+import re
 import signal
 import sys
 from pathlib import Path
@@ -281,7 +282,8 @@ def main(argv=None):
             result = app(args=args or ["--help"], standalone_mode=False, obj={"json": machine})
         code = result if isinstance(result, int) else 0
         if help_output:
-            typer.echo(json.dumps({"schema_version": 1, "status": "success", "data": {"help": help_output.getvalue()}}))
+            plain_help = re.sub(r"\x1b\[[0-?]*[ -/]*[@-~]", "", help_output.getvalue())
+            typer.echo(json.dumps({"schema_version": 1, "status": "success", "data": {"help": plain_help}}))
     except KeyboardInterrupt:
         code = 130
         typer.echo(json.dumps({"schema_version": 1, "status": "partial", "error": {"code": code, "message": "Interrupted; resume the saved run"}}))
