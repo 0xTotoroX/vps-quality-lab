@@ -1,0 +1,27 @@
+{
+  "ip": {
+    "url": "https://raw.githubusercontent.com/xykt/IPQuality/ad222ab16778be2a13a174cd1acbd69fb4cac6b7/ip.sh",
+    "sha256": "ffb17dae790341c13023a94c5141775974dd73a3653ca5fba5c4648fc5588402",
+    "filename": "ip.sh",
+    "commit": "ad222ab16778be2a13a174cd1acbd69fb4cac6b7"
+  },
+  "net": {
+    "url": "https://raw.githubusercontent.com/xykt/NetQuality/d5b99484d51286374d24b892c1b54235dc282148/net.sh",
+    "sha256": "6c40fe1ae40d969255cb63075c94882733b82ba43831341eb1aadeea7b1fbfcd",
+    "filename": "net.sh",
+    "commit": "d5b99484d51286374d24b892c1b54235dc282148"
+  },
+  "hardware": {
+    "url": "https://raw.githubusercontent.com/xykt/HardwareQuality/06f99880d516bb744afa2948261b9697c79789e2/hardware.sh",
+    "sha256": "73e032ef5409e014cca411a71c677a76db19a94ef0a96a73827b41b2059cd86c",
+    "filename": "hardware.sh",
+    "commit": "06f99880d516bb744afa2948261b9697c79789e2"
+  },
+  "xray-install": {
+    "url": "https://raw.githubusercontent.com/XTLS/Xray-install/e741a4f56d368afbb9e5be3361b40c4552d3710d/install-release.sh",
+    "sha256": "7f70c95f6b418da8b4f4883343d602964915e28748993870fd554383afdbe555",
+    "filename": "install-release.sh",
+    "commit": "e741a4f56d368afbb9e5be3361b40c4552d3710d",
+    "xray_version": "26.3.27"
+  }
+}

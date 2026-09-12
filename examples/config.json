@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "name": "Example VPS",
+  "ssh": {
+    "host": "192.0.2.10",
+    "port": 22,
+    "user": "root",
+    "known_hosts": "/private/vps-lab/known_hosts",
+    "key_file": null,
+    "password_env": "VPS_LAB_SSH_PASSWORD",
+    "connect_timeout": 10
+  },
+  "entry_host": "192.0.2.10",
+  "expected_exit": "192.0.2.10",
+  "interface": "en0",
+  "resolver": null,
+  "source_address": null,
+  "profile": "ai",
+  "plan": {},
+  "mode": "adopt",
+  "server_config": "/usr/local/etc/xray/config.json",
+  "inbound_tag": null,
+  "client_id": null,
+  "node_file": null,
+  "upstream_file": null,
+  "proxy_port": 443,
+  "reality_target": "www.bing.com:443",
+  "server_name": "www.bing.com",
+  "external_tools": [
+    "ip"
+  ],
+  "allow_deploy": false,
+  "allow_external_install": false,
+  "allow_stress": false,
+  "bootstrap_ssh": true,
+  "limits": {
+    "request_timeout": 25,
+    "samples": 3,
+    "download_bytes": 5000000,
+    "upload_bytes": 1000000,
+    "concurrency": 3,
+    "external_timeout": 240,
+    "cpu_seconds": 3
+  },
+  "download_urls": [
+    "https://speed.cloudflare.com/__down?bytes={bytes}",
+    "https://proof.ovh.net/files/10Mb.dat"
+  ],
+  "upload_url": "https://speed.cloudflare.com/__up",
+  "return_target": null
+}

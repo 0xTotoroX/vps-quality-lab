@@ -1,0 +1,4 @@
+interface:
+  display_name: "VPS Quality Lab"
+  short_description: "Deploy a REALITY node with SSH setup and verified evidence"
+  default_prompt: "Use $vps-quality-lab to bootstrap SSH, deliver a REALITY node and assess this VPS."
