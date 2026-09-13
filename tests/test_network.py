@@ -36,3 +36,11 @@ def test_post_measurement_exit_change_removes_ranking(monkeypatch, config):
     monkeypatch.setattr(network, "request", lambda *_a, **_k: [{"valid": True, "size_download": 5_000_000}])
     data = network.measure("socks5h://127.0.0.1:1234", config)
     assert not data["eligible"] and data["parallel_mbps"] is None
+
+
+def test_missing_second_ttfb_sample_is_incomplete(monkeypatch, config):
+    monkeypatch.setattr(network, "verify_exit", lambda *_: {"verified": True})
+    monkeypatch.setattr(network, "request", lambda *_a, **_k: [
+        {"valid": True, "size_download": config.limits.download_bytes}])
+    data = network.measure("socks5h://127.0.0.1:1234", config)
+    assert data["eligible"] and not data["complete"]

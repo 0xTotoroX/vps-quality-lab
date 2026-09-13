@@ -15,3 +15,9 @@ A terminated local independent client is cleaned up by PID/process group. Extern
 A native client import request is not proof of import or routing. `client-check` rereads the current archive and optionally verifies a Shadowrocket-owned loopback listener. Never overwrite an iCloud archive to force import. If a requested import cannot be completed in the app, keep the private link and QR and report the delivery as generated/import_requested.
 
 Full reports can include public IPs and local paths; only `report --share` is intended as a redacted summary. It excludes original terminal images because those can contain identifying information. The ordinary Obsidian export preserves the original screenshots in the user's private vault.
+
+## Interrupted diagnostics and report failures
+
+ANSI is streamed into the attempt directory even when the SSH command is interrupted. Check `<tool>-recovery.json`: `remote_cleaned=false` identifies scratch that was retained because JSON recovery or cleanup did not complete. Retrieve that exact directory through the existing authenticated SSH connection before manual cleanup; never remove another run's scratch. A fresh attempt does not overwrite previous ANSI/JSON or its pre-resume state snapshot.
+
+If report writing fails, fix the destination/storage problem and use `resume RUN --stages report`. This regenerates artifacts and records the outcome; it does not claim fresh network verification. Use a full resume to revalidate a current route. Legacy measurements without `contract` remain available in reports but require `--rerun` before comparison.

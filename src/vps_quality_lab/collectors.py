@@ -132,22 +132,43 @@ def external(remote, name: str, config, cache: Path, evidence: Path) -> StageRes
         flags += ["-F"]
     result = None
     structured = None
+    ansi_path = evidence / (name + ".ansi")
+    json_path = evidence / (name + ".json")
+    recovery_path = evidence / (name + "-recovery.json")
+    write_json(recovery_path, {"remote_directory": remote_dir, "remote_cleaned": False,
+                               "terminal": str(ansi_path), "json_recovered": False,
+                               "interrupted_or_failed": True})
+    recovered = False
     try:
         command = "env TERM=xterm-256color bash " + shlex.quote(remote_script) + " " + shlex.join(flags)
-        result = remote.run(command, timeout=config.limits.external_timeout, pty=True, resource_scope=True)
-        raw = result.stdout + result.stderr
-        write_private(evidence / (name + ".ansi"), raw)
+        result = remote.run(command, timeout=config.limits.external_timeout, pty=True,
+                            resource_scope=True, output_path=ansi_path)
+    finally:
+        # Salvage before cleanup, also on Ctrl-C, output limits and broken transports.
         try:
             raw_json = remote.read(remote_dir + "/result.json")
-            write_private(evidence / (name + ".json"), raw_json)
-            structured = parse_json_evidence(raw_json)
-        except (OSError, ValueError):
-            pass
-    finally:
-        # Only this invocation's random, tool-owned scratch directory is removed.
-        try:
-            remote.run("rm -rf -- " + shlex.quote(remote_dir), timeout=10)
+            write_private(json_path, raw_json)
+            recovered = True
+        except FileNotFoundError:
+            recovered = True  # The tool had not produced JSON yet.
         except Exception:
+            pass
+        cleaned = False
+        if recovered and ansi_path.is_file():
+            try:
+                cleanup = remote.run("rm -rf -- " + shlex.quote(remote_dir), timeout=10)
+                cleaned = cleanup.returncode == 0
+            except Exception:
+                pass
+        write_json(recovery_path,
+                   {"remote_directory": remote_dir, "json_recovered": recovered,
+                    "remote_cleaned": cleaned, "terminal": str(ansi_path),
+                    "interrupted_or_failed": result is None})
+    raw = ansi_path.read_bytes()
+    if json_path.is_file():
+        try:
+            structured = parse_json_evidence(json_path.read_bytes())
+        except ValueError:
             pass
     conflict_rows = conflicts(structured or {}, raw)
     validated, issues = validate_external(name, structured, config.expected_exit, raw, low_data=name == "net")
@@ -169,4 +190,4 @@ def external(remote, name: str, config, cache: Path, evidence: Path) -> StageRes
             "eligible": valid, "terminal_sha256": hashlib.sha256(raw).hexdigest()}
     write_json(evidence / (name + "-provenance.json"), {k: v for k, v in data.items() if k != "structured"})
     return StageResult(status=Status.success if valid else Status.partial, message=reason, data=data,
-                       evidence=[str(evidence / (name + ".ansi")), str(evidence / (name + ".json"))])
+                       evidence=[str(path) for path in [ansi_path, json_path] if path.is_file()])

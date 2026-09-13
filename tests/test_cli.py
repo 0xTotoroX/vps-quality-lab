@@ -12,7 +12,7 @@ from vps_quality_lab.models import Config
 def test_version_is_machine_readable(capsys):
     assert cli.main(["--json", "--version"]) == 0
     output = capsys.readouterr()
-    assert json.loads(output.out)["data"]["version"] == "0.1.0"
+    assert json.loads(output.out)["data"]["version"] == "0.1.1"
     assert not output.err
 
 

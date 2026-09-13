@@ -1,5 +1,15 @@
 # Release validation
 
+## v0.1.1 · 2026-09-13
+
+- Local macOS regression suite: 64 tests, Ruff and Skill validation pass. Tests cover stale ranking flags on interrupted revalidation, report write failure/retry, incomplete TTFB pairs, changed upload/TTFB targets, legacy comparison exclusion, typed result validation and streaming evidence recovery. The suite also runs on the disposable Ubuntu client; GitHub matrix results remain tied to the published commit.
+- Fresh Debian 12 arm64 on an isolated OrbStack machine: real OpenSSH public-key authentication, official pinned Xray installation/activation, independent sing-box 1.14.0 REALITY handshake, two-source exit validation, HTTP measurements and report generation all completed successfully.
+- Fresh Ubuntu 24.04 arm64 on a second isolated machine: injected SIGINT immediately after the real installer returned, before its completion receipt was written. The CLI exited 130 with interrupted/non-ranking state. A real resume re-ran installation, reused exactly the same pending node keys, preserved the prior state snapshot and completed SSH, node, exit, network and report stages with exit 0.
+- Both live runs used one 100 KB sample per target, 100 KB upload and one parallel connection. These tests establish installation and recovery behavior under systemd on disposable Linux machines; their NAT egress used the host network and does not establish public-VPS performance, firewall reachability or provider-specific boot behavior. No production VPS configuration or Shadowrocket selection was changed.
+- Packaging limits SHA256SUMS to the current release artifacts so older local builds cannot enter a new release manifest. The installed Skill and CLI are checked against source after installation.
+
+## v0.1.0
+
 Validated on 2026-09-12 for v0.1.0. The private live evidence is intentionally excluded from this repository and release archives.
 
 - **Local automated checks:** 49 tests passed on macOS with Python 3.13.15; Ruff passed. Coverage includes subprocess CLI output/exits, plain machine help under forced CI colors, input secrecy, host-key rejection, preservation of multiple authorized keys, concurrent-change refusal, failed fresh-key verification and policy rollback, node bundle repair, wrong exits, HTTP failures/incomplete transfers, evidence conflicts and interruption/resume. Installer failure tests prove that a partially copied binary does not suppress installation retry and that pending node keys are reused. Unowned services and changed deployment requests are rejected.

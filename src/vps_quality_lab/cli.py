@@ -14,7 +14,8 @@ import typer
 from pydantic import ValidationError
 
 from . import __version__, client, engine, report
-from .models import Config, RunResult, SSH, Status, read_config
+from .models import Config, SSH, Status, ranking_ready, read_config
+from .measurements import NetworkMeasurement, VerifyMeasurement, MeasurementContract, result_schema
 from .security import redact_urls, safe_output
 from .ssh_setup import bootstrap, effective_ssh, identity_dir, trust_host, verify_batch
 from .storage import LabError, load_run, run_lock, write_json
@@ -75,10 +76,15 @@ def initialize(ctx: typer.Context,
 
 @app.command()
 def schema(ctx: typer.Context, kind: str = "config"):
-    """Print the current JSON Schema for config or result."""
-    if kind not in ("config", "result"):
-        raise LabError("Schema kind must be config or result", 2)
-    emit(ctx, (Config if kind == "config" else RunResult).model_json_schema())
+    """Print JSON Schema: config, result, network, verify or contract."""
+    models = {"config": Config, "network": NetworkMeasurement, "verify": VerifyMeasurement,
+              "contract": MeasurementContract}
+    if kind == "result":
+        emit(ctx, result_schema())
+    elif kind in models:
+        emit(ctx, models[kind].model_json_schema())
+    else:
+        raise LabError("Schema kind must be config, result, network, verify or contract", 2)
 
 
 @app.command()
@@ -247,20 +253,28 @@ def compare(ctx: typer.Context, run_dirs: Annotated[list[Path], typer.Argument(h
     if len(run_dirs) < 2:
         raise LabError("Provide at least two runs", 2)
     states = [load_run(path) for path in run_dirs]
-    rows, shape = [], None
+    rows, shape, exclusions = [], None, []
     for state in states:
         net = state.stages.get("network")
-        signature = json.dumps({"shapes": net.data.get("shapes"), "endpoints": net.data.get("download_endpoints"),
-                                "profile": state.profile}, sort_keys=True) if net else None
+        contract = net.data.get("contract") if net else None
+        if not ranking_ready(state):
+            exclusions.append({"run_id": state.run_id, "reason": "Current attempt is incomplete or not freshly verified"})
+            continue
+        if not contract:
+            exclusions.append({"run_id": state.run_id, "reason": "Legacy measurements lack a comparison contract; rerun measurements"})
+            continue
+        signature = json.dumps(MeasurementContract.model_validate(contract).model_dump(mode="json"), sort_keys=True)
         if state.ranking_eligible and net and net.data.get("complete"):
             if shape is not None and shape != signature:
                 raise LabError("Batch measurement shapes differ; refuse a misleading ranking", 4)
             shape = signature
             rows.append({"run_id": state.run_id, "label": state.label, "metrics": report.metrics(state)})
-    key = "single_mbps" if states[0].profile == "video" else "fresh_ttfb_ms"
+    profile = json.loads(shape)["profile"] if shape else states[0].profile
+    key = "single_mbps" if profile == "video" else "fresh_ttfb_ms"
     ranked = [r for r in rows if r["metrics"].get(key) is not None]
     ranked.sort(key=lambda r: r["metrics"][key], reverse=key == "single_mbps")
     emit(ctx, {"ranking_metric": key, "ranking": ranked,
+               "exclusion_reasons": exclusions,
                "excluded": [s.run_id for s in states if s.run_id not in {r["run_id"] for r in ranked}]},
          "success" if len(ranked) == len(states) else "partial")
     if len(ranked) != len(states):

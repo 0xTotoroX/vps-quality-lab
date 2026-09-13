@@ -18,6 +18,8 @@ def test_failed_ssh_blocks_node_and_measurements(config, tmp_path, monkeypatch):
     visited = []
     def execute(stage):
         visited.append(stage)
+        if stage == "report":
+            return Engine.execute(engine, stage)
         return StageResult(status=Status.failed if stage == "ssh" else Status.success, message="test fixture")
     monkeypatch.setattr(engine, "execute", execute)
     state = engine.perform("network")

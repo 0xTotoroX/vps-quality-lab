@@ -8,7 +8,8 @@ from pathlib import Path
 
 from . import collectors, diagnostics, network, report
 from .deploy import deploy
-from .models import Config, RunResult, StageResult, Status, overall, read_config
+from .models import Config, RunResult, StageResult, Status, overall, ranking_ready, read_config
+from .measurements import NetworkMeasurement, VerifyMeasurement
 from .node import Node, adopt, fingerprint, save_node
 from .remote import Remote
 from .ssh_setup import bootstrap, effective_ssh
@@ -52,10 +53,7 @@ class Engine:
 
     def save(self):
         self.state.status = overall(self.state.stages)
-        verify = self.state.stages.get("verify")
-        net = self.state.stages.get("network")
-        self.state.ranking_eligible = bool(verify and verify.status == Status.success
-                                           and net and net.data.get("eligible") and net.data.get("complete"))
+        self.state.ranking_eligible = ranking_ready(self.state)
         write_json(self.run / "state.json", self.state.model_dump(mode="json"))
 
     def result(self, message, data=None, status=Status.success, evidence=None):
@@ -79,13 +77,21 @@ class Engine:
         if stage == "screenshots":
             return report.screenshots(self.run)
         if stage == "report":
-            return self.result("Report generated", {"report": str(self.run / "report.md")})
+            result = self.result("Report generated", {"report": str(self.run / "report.md")})
+            candidate = self.state.model_copy(deep=True)
+            candidate.stages["report"] = result
+            candidate.lifecycle = "complete"
+            candidate.status = overall(candidate.stages)
+            candidate.ranking_eligible = ranking_ready(candidate)
+            report.generate(candidate, self.run)
+            return result
         if stage == "verify":
             node = Node.model_validate_json((self.run / "private/node.json").read_text())
             with network.isolated_route(node, config) as (proxy, route):
                 data = network.verify_exit(proxy, config.expected_exit, config.limits.request_timeout)
             data["route"] = route
             data["upstream_digest"] = hashlib.sha256(config.upstream_file.read_bytes()).hexdigest() if config.upstream_file else None
+            data = VerifyMeasurement.model_validate(data).model_dump(mode="json")
             previous = self.state.stages.get("verify")
             if previous and (previous.data.get("route") != route or previous.data.get("upstream_digest") != data["upstream_digest"]):
                 for downstream in ["ip", "network", "routes", "net"]:
@@ -102,6 +108,7 @@ class Engine:
             data["route"] = route
             with Remote(self.ssh) as remote:
                 data["server_crosscheck"] = diagnostics.server_http(remote, config)
+            data = NetworkMeasurement.model_validate(data).model_dump(mode="json")
             write_json(self.evidence / "network.json", data)
             return self.result("Bounded HTTP measurements completed" if data.get("complete") else
                                "Some endpoint measurements or exit checks failed; missing data is not zero",
@@ -169,6 +176,7 @@ class Engine:
     def perform(self, selection: str, rerun: bool = False):
         selected = selected_stages(self.config, selection)
         self.state.lifecycle = "running"
+        self.state.verified_attempt = None
         for name in STAGES:
             if name not in selected and name not in self.state.stages:
                 self.state.stages[name] = self.result("Not selected", status=Status.skipped)
@@ -196,6 +204,8 @@ class Engine:
                                              status=Status.failed)
                 result.started_at, result.finished_at = started, now()
                 self.state.stages[stage] = result
+                if stage == "verify" and result.status == Status.success:
+                    self.state.verified_attempt = self.state.attempt
                 self.save()
                 self.progress(f"[{stage}] {result.status.value}: {result.message}")
                 active = None
@@ -204,11 +214,14 @@ class Engine:
                 self.state.stages[active] = self.result("Interrupted; resume rechecks prerequisites", status=Status.partial)
             self.state.lifecycle = "interrupted"
             self.save()
-            report.generate(self.state, self.run)
+            try:
+                report.generate(self.state, self.run)
+            except Exception:
+                self.state.stages["report"] = self.result("Interrupted report could not be saved", status=Status.failed)
+                self.save()
             raise
         self.state.lifecycle = "complete"
         self.save()
-        report.generate(self.state, self.run)
         return self.state
 
 
@@ -230,6 +243,8 @@ def resume(run: Path, root: Path, selection="all", rerun=False, progress=print):
         config = read_config(run / "private/config.json")
         if digest(config.model_dump(mode="json")) != state.config_digest:
             raise LabError("Run configuration changed; create a new batch instead", 4)
+        write_json(run / "evidence" / f"attempt-{state.attempt + 1:03}" / "state-before-resume.json",
+                   state.model_dump(mode="json"))
         state.attempt += 1
         with run_lock(root / "host-locks" / digest([config.ssh.host, config.ssh.port, config.ssh.user])[:20]):
             return Engine(config, run, root, state, progress).perform(selection, rerun)

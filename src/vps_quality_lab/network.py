@@ -12,6 +12,7 @@ from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 
 from .node import Node
+from .measurements import MeasurementContract
 from .process import execute
 from .storage import LabError
 
@@ -184,12 +185,16 @@ def request(url: str, proxy: str | None, limits, kind="download", reuse=False):
 
 def measure(proxy: str, config):
     limits = config.limits
+    urls = [url.format(bytes=limits.download_bytes) for url in config.download_urls]
+    contract = MeasurementContract(profile=config.profile, limits=limits,
+                                   download_endpoints=urls, upload_endpoint=config.upload_url,
+                                   ttfb_endpoint=EXIT_URLS[0], exit_endpoints=EXIT_URLS).model_dump(mode="json")
     before = verify_exit(proxy, config.expected_exit, limits.request_timeout)
     if not before["verified"]:
-        return {"eligible": False, "exit_before": before, "reason": "Unexpected or missing exit"}
+        return {"measurement_version": 1, "contract": contract, "eligible": False, "complete": False,
+                "exit_before": before, "reason": "Unexpected or missing exit"}
     ttfb = [request(EXIT_URLS[0], proxy, limits, "ttfb", reuse=True)
             for _ in range(limits.samples)]
-    urls = [url.format(bytes=limits.download_bytes) for url in config.download_urls]
     singles = []
     for index, url in enumerate(urls):
         for _ in range(limits.samples):
@@ -207,7 +212,9 @@ def measure(proxy: str, config):
     # An incomplete transfer or an incorrect exit must never contribute a throughput score.
     parallel_mbps = (sum(r["size_download"] for r in parallel) * 8 / elapsed / 1e6
                      if eligible and all(r["valid"] for r in parallel) else None)
-    return {"eligible": eligible, "complete": eligible and all(r["valid"] for r in all_rows),
+    return {"measurement_version": 1, "contract": contract,
+            "eligible": eligible, "complete": eligible and all(r["valid"] for r in all_rows)
+            and all(len(pair) == 2 for pair in ttfb),
             "exit_before": before, "exit_after": after, "ttfb_pairs": ttfb,
             "single": singles, "parallel": parallel, "parallel_seconds": elapsed,
             "parallel_mbps": parallel_mbps, "upload": uploads,

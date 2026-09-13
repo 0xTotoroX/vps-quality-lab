@@ -15,7 +15,7 @@ python3 -m venv .venv
 .venv/bin/vps-lab --version
 ```
 
-下载 wheel 后可在自己的虚拟环境中执行 `python -m pip install './vps_quality_lab-0.1.0-py3-none-any.whl[screenshots]'`，再用该环境的 Python 安装 Chromium。截图依赖可选；缺失时如实记录截图阶段未完成。
+下载 wheel 后可在自己的虚拟环境中执行 `python -m pip install './vps_quality_lab-0.1.1-py3-none-any.whl[screenshots]'`，再用该环境的 Python 安装 Chromium。截图依赖可选；缺失时如实记录截图阶段未完成。
 
 将 Release 中 Skill ZIP 解压后的 `vps-quality-lab` 文件夹安装到 `~/.codex/skills/`。已有同名 Skill 时先对比，不直接覆盖。项目中的版本位于 [skills/vps-quality-lab](skills/vps-quality-lab/SKILL.md)，可随仓库一起维护。
 
@@ -52,7 +52,7 @@ vps-lab report /path/to/run --output /path/to/export --share
 
 运行目录默认 `~/.local/share/vps-quality-lab`，可用 `VPS_LAB_HOME` 指定。凭据和报告分开；完整运行目录、原始终端图片和 Obsidian 导出可能包含主机 IP，按私有资料保管。分享版移除原图和常见标识，不导出节点或 SSH 密钥。
 
-`success / partial / failed / skipped` 均写入 JSON。错误出口、非 2xx HTTP、下载字节不全、缺失 JSON 和显式证据冲突不会成为质量得分。TTFB、单连接、并发总量、上传、TCP/ICMP、去回程和服务端交叉检查分别保存。不同时间用新 `--label` 批次；`compare` 仅接受验证过出口且测试形状一致的完整样本。
+`success / partial / failed / skipped` 均写入 JSON。错误出口、非 2xx HTTP、下载字节不全、缺失 JSON 和显式证据冲突不会成为质量得分。TTFB、单连接、并发总量、上传、TCP/ICMP、去回程和服务端交叉检查分别保存。中断期间的 ANSI 会流式保存；远端证据取回失败时保留临时目录并记录恢复路径。报告生成失败会写入失败状态，可用 `resume RUN --stages report` 重试。不同时间用新 `--label` 批次；`compare` 仅接受验证过出口且测试形状一致的完整样本。比较契约包含上传、下载和 TTFB 目标、协议版本及测试规模；旧批次可继续读取和导出，缺少契约时须重测后再排名。
 
 原始 ANSI 与 JSON 一起归档；截图通过 xterm.js 重放原始 ANSI 后直接获取像素，截取最终报告或末尾终端视口，保留颜色并记录源 SHA256 和截取范围，不使用 OCR。完整原始流继续保留。HTTPS 探针不等于账号登录、AI 对话或视频播放；UDP 与跨时段稳定性也不能由一次 TCP 测试推断。
 

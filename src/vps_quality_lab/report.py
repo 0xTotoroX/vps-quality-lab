@@ -8,7 +8,7 @@ import sys
 from importlib.resources import files
 from pathlib import Path
 
-from .models import RunResult, StageResult, Status
+from .models import RunResult, StageResult, Status, ranking_ready
 from .security import redact_urls
 from .storage import LabError, private_dir, write_json, write_private
 
@@ -147,7 +147,7 @@ def report_text(state: RunResult, run: Path, share=False):
              f"用途：{labels.get(state.profile,state.profile)}。本批结果：**{state.status.value}**。",
              f"SSH：**{state.ssh_delivery}**；节点交付：**{state.node_delivery}**。", ""]
     lines += measurement_context(state, run) + [""]
-    if state.ranking_eligible:
+    if state.ranking_eligible and ranking_ready(state):
         lines.append("独立 REALITY 链路已在测量前后通过两家 HTTPS 出口核对；有效样本可用于相同测试形状的比较。")
     else:
         lines.append("本批数据未满足链路排名条件，不据此给出质量排名或用缺失值计算零分。")

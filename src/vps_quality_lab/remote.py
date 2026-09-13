@@ -9,7 +9,7 @@ import paramiko
 
 from .models import SSH
 from .process import CommandResult
-from .storage import LabError
+from .storage import LabError, write_private
 
 
 class Remote:
@@ -43,7 +43,7 @@ class Remote:
         self.client.close()
 
     def run(self, command: str, timeout: int = 30, data: bytes | None = None,
-            pty: bool = False, resource_scope: bool = False) -> CommandResult:
+            pty: bool = False, resource_scope: bool = False, output_path=None) -> CommandResult:
         unit = "vps-lab-" + uuid.uuid4().hex[:16]
         bounded = f"timeout -k 3s {timeout}s bash -c {shlex.quote(command)}"
         if resource_scope:
@@ -52,9 +52,13 @@ class Remote:
                        "-p RuntimeMaxSec=" + str(timeout + 5) + " " + bounded)
         channel = self.client.get_transport().open_session(timeout=10)
         out, err = bytearray(), bytearray()
-        if pty:
-            channel.get_pty(term="xterm-256color", width=160, height=60)
+        output = None
         try:
+            if output_path is not None:
+                write_private(output_path, b"")
+                output = output_path.open("ab", buffering=0)
+            if pty:
+                channel.get_pty(term="xterm-256color", width=160, height=60)
             channel.exec_command(bounded)
             if data:
                 channel.sendall(data)
@@ -62,9 +66,15 @@ class Remote:
             deadline = time.monotonic() + timeout + 10
             while True:
                 while channel.recv_ready():
-                    out.extend(channel.recv(65536))
+                    chunk = channel.recv(65536)
+                    out.extend(chunk)
+                    if output:
+                        output.write(chunk)
                 while channel.recv_stderr_ready():
-                    err.extend(channel.recv_stderr(65536))
+                    chunk = channel.recv_stderr(65536)
+                    err.extend(chunk)
+                    if output:
+                        output.write(chunk)
                 if len(out) + len(err) > 8_000_000:
                     raise LabError("Remote output exceeded 8 MB limit")
                 if channel.exit_status_ready() and not channel.recv_ready():
@@ -83,9 +93,15 @@ class Remote:
             raise
         finally:
             channel.close()
+            if output:
+                try:
+                    os.fsync(output.fileno())
+                finally:
+                    output.close()
 
     def read(self, path: str, maximum: int = 8_000_000) -> bytes:
         with self.client.open_sftp() as sftp:
+            sftp.get_channel().settimeout(self.config.connect_timeout)
             with sftp.open(path, "rb") as stream:
                 data = stream.read(maximum + 1)
         if len(data) > maximum:

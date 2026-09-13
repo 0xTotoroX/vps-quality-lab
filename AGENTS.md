@@ -10,3 +10,5 @@ Fail closed on unknown SSH identities, existing configuration ownership and unex
 Tests must cover observable failures and recovery; test fixtures use documentation IP ranges.
 Do not change a system proxy or Shadowrocket selection during verification.
 Use Python + Typer and preserve the runtime/config boundary in the model and executor.
+
+`measurements.py` owns versioned network/exit schemas and comparison inputs. Preserve legacy record readability; never fabricate missing contracts or current-attempt verification. Stream diagnostic evidence before cleanup and record report success only after writing artifacts.

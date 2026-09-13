@@ -163,10 +163,30 @@ class RunResult(Model):
     created_at: str
     config_digest: str
     attempt: int = 0
+    verified_attempt: int | None = None
     stages: dict[str, StageResult] = Field(default_factory=dict)
     node_delivery: Literal["not_generated", "generated", "import_requested", "imported", "verified"] = "not_generated"
     ranking_eligible: bool = False
     ssh_delivery: Literal["not_configured", "configured", "verified"] = "not_configured"
+
+    @model_validator(mode="after")
+    def validate_measurements(self):
+        from .measurements import NetworkMeasurement, VerifyMeasurement
+        for name, model in [("network", NetworkMeasurement), ("verify", VerifyMeasurement)]:
+            stage = self.stages.get(name)
+            if stage and "measurement_version" in stage.data:
+                model.model_validate(stage.data)
+        return self
+
+
+def ranking_ready(state: RunResult) -> bool:
+    verify, net = state.stages.get("verify"), state.stages.get("network")
+    return bool(state.lifecycle == "complete" and state.verified_attempt == state.attempt
+                and state.verified_attempt is not None
+                and all(state.stages.get(s) and state.stages[s].status == Status.success
+                        for s in ("ssh", "check", "node", "verify"))
+                and verify and net and net.status == Status.success
+                and net.data.get("eligible") and net.data.get("complete"))
 
 
 def read_config(path: Path) -> Config:

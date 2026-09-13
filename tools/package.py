@@ -29,7 +29,8 @@ def main():
         for path in sorted(skill.rglob('*')):
             if path.is_file():
                 archive.write(path, path.relative_to(skill_root))
-    packages = sorted([*dist.glob('*.whl'), *dist.glob('*.tar.gz'), target])
+    packages = sorted([dist / f'vps_quality_lab-{__version__}-py3-none-any.whl',
+                       dist / f'vps_quality_lab-{__version__}.tar.gz', target])
     for path in packages:
         if path.suffix == '.gz':
             with tarfile.open(path) as archive:
